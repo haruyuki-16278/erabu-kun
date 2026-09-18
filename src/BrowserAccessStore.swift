@@ -33,11 +33,21 @@ class BrowserAccessStore {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.message = "\(browser.displayName) のプロファイルデータフォルダへのアクセスを許可してください。"
+        panel.message = "\(browser.displayName) のプロファイルデータフォルダへのアクセスを許可してください。\n（あらかじめ該当フォルダを開いた状態で表示されます。そのまま「許可」を押してください）"
         panel.prompt = "許可"
 
         if let suggested = browser.userDataDirectoryURL {
-            panel.directoryURL = suggested.deletingLastPathComponent()
+            // 目的のフォルダ自体をブラウズ対象として開く。
+            // NSOpenPanel は、フォルダ内で何も選択せず「許可」を押すと
+            // 現在開いているフォルダ自体を選択結果として返すため、
+            // ユーザーは追加のナビゲーション操作なしにこのフォルダを許可できる。
+            if FileManager.default.fileExists(atPath: suggested.path) {
+                panel.directoryURL = suggested
+            } else {
+                // ブラウザ未起動などでフォルダがまだ存在しない場合は、
+                // 一つ上の階層（例: Application Support/Google/）から開始する。
+                panel.directoryURL = suggested.deletingLastPathComponent()
+            }
         }
 
         guard panel.runModal() == .OK, let url = panel.url else { return false }
