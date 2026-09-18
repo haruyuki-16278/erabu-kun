@@ -35,11 +35,32 @@ class AppSettings: ObservableObject {
             UserDefaults.standard.set(profileOrder, forKey: "profileOrder")
         }
     }
+
+    /// リンクを開く際のポップアップに表示しないブラウザ・プロファイルのID集合。
+    /// BrowserProfile.id (例: "Google Chrome_Default") を保持する。
+    @Published var hiddenProfileIDs: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(hiddenProfileIDs), forKey: "hiddenProfileIDs")
+        }
+    }
     
     init() {
         self.defaultBrowserID = UserDefaults.standard.string(forKey: "defaultBrowserID") ?? KnownBrowser.chrome.id
         self.defaultProfileName = UserDefaults.standard.string(forKey: "defaultProfileName") ?? "Default"
         self.profileOrder = UserDefaults.standard.stringArray(forKey: "profileOrder") ?? []
+        self.hiddenProfileIDs = Set(UserDefaults.standard.stringArray(forKey: "hiddenProfileIDs") ?? [])
+    }
+
+    func isProfileHidden(_ profile: BrowserProfile) -> Bool {
+        hiddenProfileIDs.contains(profile.id)
+    }
+
+    func setProfileHidden(_ profile: BrowserProfile, hidden: Bool) {
+        if hidden {
+            hiddenProfileIDs.insert(profile.id)
+        } else {
+            hiddenProfileIDs.remove(profile.id)
+        }
     }
 }
 
@@ -252,9 +273,10 @@ struct SettingsView: View {
     // MARK: - Profile Order Tab
     private var orderingTab: some View {
         VStack(alignment: .leading) {
-            Text("Drag and drop to reorder profiles in the popup window.")
+            Text("Drag and drop to reorder profiles in the popup window. Use the eye icon to hide a profile from the popup.")
                 .font(.caption)
                 .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding([.top, .horizontal])
             
             List {
@@ -264,13 +286,22 @@ struct SettingsView: View {
                             .resizable()
                             .frame(width: 24, height: 24)
                             .clipShape(Circle())
+                            .opacity(settings.isProfileHidden(profile) ? 0.4 : 1.0)
                         Text(profile.name)
+                            .foregroundColor(settings.isProfileHidden(profile) ? .secondary : .primary)
                         Spacer()
                         if profile.name != profile.browserName {
                             Text(profile.browserName)
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
+                        Button {
+                            settings.setProfileHidden(profile, hidden: !settings.isProfileHidden(profile))
+                        } label: {
+                            Image(systemName: settings.isProfileHidden(profile) ? "eye.slash" : "eye")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(settings.isProfileHidden(profile) ? "Show in popup" : "Hide from popup")
                     }
                 }
                 .onMove(perform: moveProfiles)

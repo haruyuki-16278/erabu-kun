@@ -46,12 +46,15 @@ struct PopupView: View {
         .onAppear {
             let scanned = ProfileScanner.scanAll()
             let order = AppSettings.shared.profileOrder
-            self.profiles = scanned.sorted { p1, p2 in
-                let idx1 = order.firstIndex(of: p1.id) ?? Int.max
-                let idx2 = order.firstIndex(of: p2.id) ?? Int.max
-                if idx1 == idx2 { return p1.name < p2.name }
-                return idx1 < idx2
-            }
+            let hidden = AppSettings.shared.hiddenProfileIDs
+            self.profiles = scanned
+                .filter { !hidden.contains($0.id) }
+                .sorted { p1, p2 in
+                    let idx1 = order.firstIndex(of: p1.id) ?? Int.max
+                    let idx2 = order.firstIndex(of: p2.id) ?? Int.max
+                    if idx1 == idx2 { return p1.name < p2.name }
+                    return idx1 < idx2
+                }
         }
     }
 }
