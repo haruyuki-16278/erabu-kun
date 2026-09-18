@@ -35,3 +35,25 @@ Erabu-kun は、リンクを開く際にどのブラウザで開くかを動的�
 3. `./build_release.sh` を実行します。
 4. ビルド、署名、DMG化、公証（Notarization）まで全て自動で行われます。
 5. 完成したパッケージは `build/Erabu-kun.dmg` に生成されます。
+
+## CI（GitHub Actions）でのビルドについて
+
+`main` ブランチへの push、または手動実行（`workflow_dispatch`）で、
+`.github/workflows/build-and-release.yml` が macOS ランナー上でビルド・署名・
+公証・DMG化までを自動実行し、成果物として `Erabu-kun.dmg` をアーティファクトに
+アップロードします。
+
+CIを動かすには、リポジトリの **Settings > Secrets and variables > Actions** で
+以下のSecretsを事前に登録してください（秘密鍵を含むため、これらはご自身で
+用意・登録する必要があります）。
+
+| Secret名 | 内容 |
+|---|---|
+| `APPLE_ID` | 公証に使うApple ID |
+| `APP_SPECIFIC_PASSWORD` | 上記Apple IDのアプリ専用パスワード |
+| `DEVELOPER_ID_APPLICATION_P12` | `Developer ID Application` 証明書を `.p12` でエクスポートし、base64エンコードした文字列（`base64 -i cert.p12 \| pbcopy` など） |
+| `DEVELOPER_ID_APPLICATION_PASSWORD` | 上記 `.p12` ファイルのエクスポート時に設定したパスワード |
+| `KEYCHAIN_PASSWORD` | CI実行中にのみ使う一時キーチェーンのパスワード（任意の文字列で可） |
+
+証明書はキーチェーンアクセスで対象の証明書と秘密鍵を選択し、「書き出す」から
+`.p12` 形式でエクスポートできます。
