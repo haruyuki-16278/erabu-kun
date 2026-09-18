@@ -34,6 +34,10 @@ class BrowserLauncher {
 
         do {
             try task.run()
+            // メニューバーの「最近開いたリンク」表示用に記録（永続化はしない）
+            DispatchQueue.main.async {
+                RecentLaunchStore.shared.record(url: url, profile: profile)
+            }
         } catch {
             print("Failed to launch browser: \(error)")
         }
@@ -52,6 +56,13 @@ class BrowserLauncher {
         } else {
             // 見つからなければOSのデフォルトで開く（フォールバック）
             NSWorkspace.shared.open(url)
+            DispatchQueue.main.async {
+                RecentLaunchStore.shared.record(
+                    url: url,
+                    browserDisplayName: "System Default",
+                    profileDisplayName: ""
+                )
+            }
         }
     }
 }

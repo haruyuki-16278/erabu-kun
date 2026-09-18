@@ -6,6 +6,9 @@ struct ErabukunApp: App {
     // AppDelegateを接続（URLのハンドリング等に必要）
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
+    // メニューバーのメニューに「最近開いたリンク」を表示するため監視する
+    @StateObject private var recentLaunches = RecentLaunchStore.shared
+    
     // メニューバーアイコンを動的に取得・リサイズする
     private var menuBarIcon: NSImage {
         if let path = Bundle.main.path(forResource: "bar-icon", ofType: "png"),
@@ -22,6 +25,22 @@ struct ErabukunApp: App {
     var body: some Scene {
         // メニューバーに常駐するアイコンとメニュー
         MenuBarExtra {
+            if !recentLaunches.entries.isEmpty {
+                Text("Recently Opened")
+                ForEach(recentLaunches.entries) { entry in
+                    Button {
+                        if let profile = entry.profile {
+                            BrowserLauncher.launch(url: entry.url, profile: profile)
+                        } else {
+                            NSWorkspace.shared.open(entry.url)
+                        }
+                    } label: {
+                        Text("\(entry.shortURLDescription) — \(entry.browserProfileDescription)")
+                    }
+                }
+                Divider()
+            }
+            
             Button("Settings...") {
                 openSettings()
             }

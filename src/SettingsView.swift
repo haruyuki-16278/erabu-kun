@@ -68,6 +68,24 @@ struct SettingsView: View {
     @ObservedObject var settings = AppSettings.shared
     @State private var availableProfiles: [BrowserProfile] = []
     
+    // Generalタブ: 「Default Browser」「Default Profile」は明示的な保存ボタンを
+    // 押すまでUserDefaultsへ反映しない（保存漏れ・意図しない上書きを防ぐため）。
+    // Picker類はこのpending値にバインドし、Saveボタン押下時にsettingsへ反映する。
+    @State private var pendingBrowserID: String = ""
+    @State private var pendingProfileName: String = ""
+    private enum SaveStatus: Equatable {
+        case saved
+        case unsaved
+    }
+    // pending値と実際にUserDefaultsへ反映済みの値を比較して算出する。
+    // @Stateで別管理すると、初期化時のPicker onChangeが非同期に発火する
+    // タイミング次第で「未保存」に誤って上書きされるバグがあったため、
+    // 単純比較のcomputed propertyにして常に正しい状態を保証する。
+    private var saveStatus: SaveStatus {
+        (pendingBrowserID == settings.defaultBrowserID && pendingProfileName == settings.defaultProfileName)
+            ? .saved : .unsaved
+    }
+    
     // カスタムブラウザ管理用
     @State private var customBrowsers: [CustomBrowser] = []
     
@@ -149,6 +167,8 @@ struct SettingsView: View {
         )
         .onAppear {
             self.customBrowsers = ProfileScanner.getCustomBrowsers()
+            self.pendingBrowserID = settings.defaultBrowserID
+            self.pendingProfileName = settings.defaultProfileName
             loadProfiles()
             
             let scanned = ProfileScanner.scanAll()
@@ -179,7 +199,7 @@ struct SettingsView: View {
     private var generalTab: some View {
         VStack(alignment: .leading, spacing: 20) {
             Form {
-                Picker("Default Browser", selection: $settings.defaultBrowserID) {
+                Picker("Default Browser", selection: $pendingBrowserID) {
                     // 既知のブラウザ
                     ForEach(KnownBrowser.allCases) { browser in
                         Text(browser.displayName).tag(browser.id)
@@ -193,14 +213,14 @@ struct SettingsView: View {
                         }
                     }
                 }
-                .onChangeCompat(of: settings.defaultBrowserID) { _ in
+                .onChangeCompat(of: pendingBrowserID) { _ in
                     loadProfiles()
                     if let first = availableProfiles.first {
-                        settings.defaultProfileName = first.directoryName
+                        pendingProfileName = first.directoryName
                     }
                 }
                 
-                Picker("Default Profile", selection: $settings.defaultProfileName) {
+                Picker("Default Profile", selection: $pendingProfileName) {
                     if availableProfiles.isEmpty {
                         Text("No Profiles Found").tag("Default")
                     } else {
@@ -222,6 +242,19 @@ struct SettingsView: View {
             .padding()
             
             Spacer()
+            
+            HStack {
+                Button("Save") {
+                    settings.defaultBrowserID = pendingBrowserID
+                    settings.defaultProfileName = pendingProfileName
+                }
+                .disabled(saveStatus == .saved)
+                
+                saveStatusLabel
+                
+                Spacer()
+            }
+            .padding(.horizontal)
             
             HStack {
                 Button("Set as Default Browser") {
@@ -369,16 +402,30 @@ struct SettingsView: View {
     }
     
     private func loadProfiles() {
-        // KnownBrowserかCustomBrowserかを探す
-        if let known = KnownBrowser.allCases.first(where: { $0.id == settings.defaultBrowserID }) {
+        // KnownBrowserかCustomBrowserかを探す（未保存の選択中ブラウザを基準にする）
+        if let known = KnownBrowser.allCases.first(where: { $0.id == pendingBrowserID }) {
             self.availableProfiles = ProfileScanner.scan(knownBrowser: known)
-        } else if let custom = customBrowsers.first(where: { $0.id == settings.defaultBrowserID }) {
+        } else if let custom = customBrowsers.first(where: { $0.id == pendingBrowserID }) {
             self.availableProfiles = ProfileScanner.scan(customBrowser: custom)
         } else {
             self.availableProfiles = []
         }
     }
-    
+
+    private var saveStatusLabel: some View {
+        Group {
+            switch saveStatus {
+            case .saved:
+                Label("Saved", systemImage: "checkmark.circle.fill")
+                    .foregroundColor(.secondary)
+            case .unsaved:
+                Label("Unsaved changes", systemImage: "exclamationmark.circle.fill")
+                    .foregroundColor(.orange)
+            }
+        }
+        .font(.caption)
+    }
+
     private func setAsDefaultBrowser() {
         guard let appURL = Bundle.main.bundleURL as URL? else { return }
         let bundleID = Bundle.main.bundleIdentifier ?? "unknown"
