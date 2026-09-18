@@ -146,17 +146,15 @@ struct OnboardingView: View {
     }
     
     private func setAsDefaultBrowser() {
-        guard let bundleID = Bundle.main.bundleIdentifier as CFString? else { return }
-        
-        let httpScheme = "http" as CFString
-        let httpsScheme = "https" as CFString
-        
-        if #available(macOS 12.0, *) {
-            LSSetDefaultHandlerForURLScheme(httpScheme, bundleID)
-            LSSetDefaultHandlerForURLScheme(httpsScheme, bundleID)
-        } else {
-            LSSetDefaultHandlerForURLScheme(httpScheme, bundleID)
-            LSSetDefaultHandlerForURLScheme(httpsScheme, bundleID)
+        guard let appURL = Bundle.main.bundleURL as URL? else { return }
+        let bundleID = Bundle.main.bundleIdentifier ?? "unknown"
+
+        for scheme in ["http", "https"] {
+            NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: scheme) { error in
+                if let error = error {
+                    print("Onboarding: Failed to set default handler for \(scheme): \(error)")
+                }
+            }
         }
         print("Onboarding: Set \(bundleID) as default browser.")
         

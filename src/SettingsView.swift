@@ -1,6 +1,20 @@
 import SwiftUI
 import ServiceManagement
 
+extension View {
+    /// macOS 14 で追加された2引数版 onChange を使いつつ、macOS 13 でも動作する互換ヘルパー。
+    @ViewBuilder
+    func onChangeCompat<V: Equatable>(of value: V, perform action: @escaping (V) -> Void) -> some View {
+        if #available(macOS 14.0, *) {
+            self.onChange(of: value) { _, newValue in
+                action(newValue)
+            }
+        } else {
+            self.onChange(of: value, perform: action)
+        }
+    }
+}
+
 class AppSettings: ObservableObject {
     static let shared = AppSettings()
     
@@ -61,7 +75,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    .onChange(of: settings.defaultBrowserID) { _ in
+                    .onChangeCompat(of: settings.defaultBrowserID) { _ in
                         loadProfiles()
                         if let first = availableProfiles.first {
                             settings.defaultProfileName = first.directoryName
@@ -82,7 +96,7 @@ struct SettingsView: View {
                         Divider()
                         
                         Toggle("Launch at Login", isOn: $isLaunchAtLoginEnabled)
-                            .onChange(of: isLaunchAtLoginEnabled) { newValue in
+                            .onChangeCompat(of: isLaunchAtLoginEnabled) { newValue in
                                 toggleLaunchAtLogin(enabled: newValue)
                             }
                     }
@@ -224,17 +238,15 @@ struct SettingsView: View {
     }
     
     private func setAsDefaultBrowser() {
-        guard let bundleID = Bundle.main.bundleIdentifier as CFString? else { return }
-        
-        let httpScheme = "http" as CFString
-        let httpsScheme = "https" as CFString
-        
-        if #available(macOS 12.0, *) {
-            LSSetDefaultHandlerForURLScheme(httpScheme, bundleID)
-            LSSetDefaultHandlerForURLScheme(httpsScheme, bundleID)
-        } else {
-            LSSetDefaultHandlerForURLScheme(httpScheme, bundleID)
-            LSSetDefaultHandlerForURLScheme(httpsScheme, bundleID)
+        guard let appURL = Bundle.main.bundleURL as URL? else { return }
+        let bundleID = Bundle.main.bundleIdentifier ?? "unknown"
+
+        for scheme in ["http", "https"] {
+            NSWorkspace.shared.setDefaultApplication(at: appURL, toOpenURLsWithScheme: scheme) { error in
+                if let error = error {
+                    print("Failed to set default handler for \(scheme): \(error)")
+                }
+            }
         }
         print("Set \(bundleID) as default browser.")
     }

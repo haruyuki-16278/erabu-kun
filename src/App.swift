@@ -62,6 +62,7 @@ struct ErabukunApp: App {
     }
 }
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     
     private let urlHandler = URLHandler()
