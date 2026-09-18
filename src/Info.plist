@@ -16,6 +16,9 @@
     <string>1.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <!-- App Store掲載カテゴリ -->
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
     <!-- バックグラウンド（メニューバー専用）アプリとして動作 -->
     <key>LSUIElement</key>
     <true/>
