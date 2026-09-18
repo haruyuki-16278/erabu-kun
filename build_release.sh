@@ -53,6 +53,11 @@ mkdir -p "${RESOURCES_DIR}"
 
 cp src/Info.plist "${CONTENTS_DIR}/Info.plist"
 
+# ビルド番号は git のコミット数から自動生成する（コミットのたびに一意な連番になる）
+BUILD_NUMBER=$(git rev-list --count HEAD)
+echo "ビルド番号: ${BUILD_NUMBER} (git commit count)"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUMBER}" "${CONTENTS_DIR}/Info.plist"
+
 # アプリアイコン (icon.png) から .icns を生成して組み込む
 if [ -f "icon.png" ]; then
     echo "Creating AppIcon.icns from icon.png..."

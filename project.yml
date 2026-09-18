@@ -7,8 +7,6 @@ options:
 settings:
   base:
     PRODUCT_NAME: Erabu-kun
-    MARKETING_VERSION: "1.0.1"
-    CURRENT_PROJECT_VERSION: "2"
     SWIFT_VERSION: 5.0
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     ENABLE_HARDENED_RUNTIME: YES
@@ -37,3 +35,11 @@ targets:
         CODE_SIGN_ENTITLEMENTS: src/Erabukun.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: net.relicsnow.erabukun
         GENERATE_INFOPLIST_FILE: NO
+    postbuildScripts:
+      - name: Set build number from git commit count
+        script: |
+          # CFBundleVersion (ビルド番号) を git のコミット数から自動設定する。
+          # コード署名より前に、生成済み Info.plist を直接書き換える。
+          BUILD_NUMBER=$(git -C "${SRCROOT}" rev-list --count HEAD)
+          PLIST="${TARGET_BUILD_DIR}/${INFOPLIST_PATH}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUMBER}" "${PLIST}"
