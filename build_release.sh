@@ -73,6 +73,9 @@ if [ -f "icon.png" ]; then
     
     # .icnsファイルに変換してResourcesに配置
     iconutil -c icns "${ICONSET_DIR}" -o "${RESOURCES_DIR}/AppIcon.icns"
+    # Info.plist は Xcode プロジェクト（Asset Catalog経由でアイコンを解決）と共用しているため、
+    # ここでは本スクリプト独自の .icns 埋め込み方式向けに CFBundleIconFile を後付けする。
+    /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "${CONTENTS_DIR}/Info.plist" 2>/dev/null || true
 else
     echo "⚠️ icon.png が見つかりませんでした。デフォルトのアイコンになります。"
 fi

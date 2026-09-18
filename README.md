@@ -41,6 +41,31 @@ Erabu-kun は、リンクを開く際にどのブラウザで開くかを動的�
 4. ビルド、署名、DMG化、公証（Notarization）まで全て自動で行われます。
 5. 完成したパッケージは `build/Erabu-kun.dmg` に生成されます。
 
+## Xcodeでの開発・Mac App Store配布ビルドについて
+
+Developer ID配布（上記のDMGビルド）とは別に、Mac App Store提出用には
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) で生成するXcodeプロジェクトを使用します。
+`Erabukun.xcodeproj` は `project.yml` から生成されるため、リポジトリには含まれていません。
+
+1. XcodeGenをインストールします（初回のみ）。
+   ```
+   brew install xcodegen
+   ```
+2. プロジェクトルートで以下を実行し、`Erabukun.xcodeproj` を生成します。
+   ```
+   xcodegen generate
+   ```
+3. `Erabukun.xcodeproj` をXcodeで開きます。
+4. 「Signing & Capabilities」タブで自分のApple Developerアカウントのチームを選択し、
+   「Automatically manage signing」が有効になっていることを確認します
+   （初回はApp Store Connect側でのApp ID登録・Provisioning Profileの自動作成が行われます）。
+5. Product > Archive でアーカイブを作成し、Organizerから
+   「Distribute App」→「App Store Connect」を選択してアップロードします。
+
+`src/*.swift` のソースコードはDeveloper ID配布用の `build_release.sh` と
+共有しているため、どちらの方法でビルドしても同じ機能が反映されます。
+`project.yml` を変更した場合は、必ず `xcodegen generate` を再実行してください。
+
 ## CI（GitHub Actions）でのビルドについて
 
 `main` ブランチへの push、または手動実行（`workflow_dispatch`）で、

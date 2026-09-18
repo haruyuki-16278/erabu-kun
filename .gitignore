@@ -11,3 +11,8 @@ docs/**/__pycache__/
 
 # macOS build products
 DerivedData/
+
+# XcodeGenで生成されるプロジェクトファイル（project.yml から再生成可能）
+Erabukun.xcodeproj/
+xcuserdata/
+dmg-background.png
