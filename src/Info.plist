@@ -22,6 +22,13 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <!-- 著作権表記。App Store の「情報」欄に表示される -->
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 Toshiyuki Yamaji</string>
+    <!-- HTTPS通信以外に独自の暗号化を実装していないため、輸出コンプライアンスの
+         審査質問（App Store Connectアップロード時）をスキップできるようにする -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     
     <!-- URLスキームの登録: http と https のインターセプト -->
     <key>CFBundleURLTypes</key>
