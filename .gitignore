@@ -1,0 +1,13 @@
+.env
+.DS_Store
+
+# Generated application bundles and disk images
+build/
+
+# Python local environments and generated files
+docs/**/.venv/
+docs/**/__pycache__/
+*.py[cod]
+
+# macOS build products
+DerivedData/
