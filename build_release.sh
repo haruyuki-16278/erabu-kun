@@ -121,10 +121,6 @@ mkdir -p "${DMG_SRC_DIR}"
 cp -R "${APP_DIR}" "${DMG_SRC_DIR}/"
 ln -s /Applications "${DMG_SRC_DIR}/Applications"
 
-if [ -f "README.md" ]; then
-    cp "README.md" "${DMG_SRC_DIR}/"
-fi
-
 echo "DMG用の背景画像を生成します..."
 if swift gen_dmg_bg.swift; then
     mkdir -p "${DMG_SRC_DIR}/.background"
@@ -165,10 +161,6 @@ echo '
            
            set position of item "'"${APP_NAME}"'.app" of container window to {120, 110}
            set position of item "Applications" of container window to {360, 110}
-           
-           try
-               set position of item "README.md" of container window to {240, 220}
-           end try
            close
            open
            update without registering applications
