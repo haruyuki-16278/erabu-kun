@@ -2,6 +2,11 @@
 
 Erabu-kun は、リンクを開く際にどのブラウザで開くかを動的に選択・ルーティングするための macOS 向けメニューバー常駐型アプリケーションです。
 
+配布は **Developer ID（notarized DMG）経由のみ** です。App Sandboxが必須の
+Mac App Storeではプロファイル別振り分け機能が利用できないため（詳細は後述）、
+本アプリはMac App Storeでは配布していません。
+紹介ページ: https://haruyuki-16278.github.io/erabu-kun/
+
 ## 特徴
 - メニューバーに常駐し、URLを開く際のデフォルトブラウザとして動作します。
 - プロファイルやルールに基づいて、適切なブラウザ（Chrome, Safari, Firefoxなど）でリンクを開き分けます。
@@ -9,7 +14,7 @@ Erabu-kun は、リンクを開く際にどのブラウザで開くかを動的�
 
 ## インストール方法
 
-1. [Releases] ページから最新の `.dmg` ファイルをダウンロードします。
+1. [Releases](https://github.com/haruyuki-16278/erabu-kun/releases/latest) ページから最新の `.dmg` ファイルをダウンロードします。
 2. ダウンロードした `.dmg` ファイルをダブルクリックして開きます。
 3. 開いたウィンドウ内で、`Erabu-kun.app` のアイコンを右側の `Applications`（アプリケーション）フォルダのアイコンにドラッグ＆ドロップしてください。
 4. インストールが完了したら、`Applications` フォルダから `Erabu-kun.app` を起動できます。
@@ -41,10 +46,16 @@ Erabu-kun は、リンクを開く際にどのブラウザで開くかを動的�
 4. ビルド、署名、DMG化、公証（Notarization）まで全て自動で行われます。
 5. 完成したパッケージは `build/Erabu-kun.dmg` に生成されます。
 
-## Xcodeでの開発・Mac App Store配布ビルドについて
+## Xcodeでの開発ビルドについて（Mac App Store提出は現在行っていません）
 
-Developer ID配布（上記のDMGビルド）とは別に、Mac App Store提出用には
-[XcodeGen](https://github.com/yonaskolb/XcodeGen) で生成するXcodeプロジェクトを使用します。
+> **注記**: App Sandbox環境下では `open`/`NSWorkspace` 経由の引数渡し（`--profile-directory=`等）が
+> OSレベルで無効化されるため、Mac App Store配布ではプロファイル別振り分けという
+> 本アプリの主要機能が動作しません。そのため現在はMac App Store提出を行わず、
+> Developer ID配布（上記のDMGビルド）のみで公開しています。
+> 以下はXcodeでの開発・動作確認用のビルド手順として残しています。
+
+[XcodeGen](https://github.com/yonaskolb/XcodeGen) で生成するXcodeプロジェクトを使うと、
+Xcode上でのデバッグ実行や将来的な再提出の検討も可能です。
 `Erabukun.xcodeproj` は `project.yml` から生成されるため、リポジトリには含まれていません。
 
 1. XcodeGenをインストールします（初回のみ）。
@@ -72,6 +83,20 @@ Developer ID配布（上記のDMGビルド）とは別に、Mac App Store提出�
 `.github/workflows/build-and-release.yml` が macOS ランナー上でビルド・署名・
 公証・DMG化までを自動実行し、成果物として `Erabu-kun.dmg` をアーティファクトに
 アップロードします。
+
+さらに `v*` 形式のタグ（例: `v1.0.1`）をpushすると、同じワークフローが
+DMGを添付した [GitHub Release](https://github.com/haruyuki-16278/erabu-kun/releases)
+を自動作成します。新しいバージョンを公開する際は、`src/Info.plist` の
+`CFBundleShortVersionString` を更新した上で以下のようにタグを打ってください。
+
+```
+git tag -a v1.0.2 -m "v1.0.2"
+git push origin v1.0.2
+```
+
+紹介用のランディングページ（`gh-pages` ブランチ、
+https://haruyuki-16278.github.io/erabu-kun/ ）は最新Releaseへ自動リンクしているため、
+リリースを作成するだけでダウンロードリンクも更新されます。
 
 CIを動かすには、リポジトリの **Settings > Secrets and variables > Actions** で
 以下のSecretsを事前に登録してください（秘密鍵を含むため、これらはご自身で
