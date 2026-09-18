@@ -41,13 +41,16 @@ class BrowserAccessStore {
             // NSOpenPanel は、フォルダ内で何も選択せず「許可」を押すと
             // 現在開いているフォルダ自体を選択結果として返すため、
             // ユーザーは追加のナビゲーション操作なしにこのフォルダを許可できる。
-            if FileManager.default.fileExists(atPath: suggested.path) {
-                panel.directoryURL = suggested
-            } else {
-                // ブラウザ未起動などでフォルダがまだ存在しない場合は、
-                // 一つ上の階層（例: Application Support/Google/）から開始する。
-                panel.directoryURL = suggested.deletingLastPathComponent()
-            }
+            //
+            // 注意: ここでは FileManager.fileExists による事前確認は行わない。
+            // アクセス許可を得る「前」の時点では、サンドボックス化された
+            // アプリ自身はこのフォルダの存在確認（stat）すらできないことが多く、
+            // fileExists は実在していても false を返してしまう（＝一段上の
+            // 階層にフォールバックしてしまい、Edge等で正しいフォルダが
+            // 開かれない不具合の原因だった）。
+            // NSOpenPanel 自体は Powerbox 経由の別プロセスで動作するため、
+            // アプリ側がアクセス権を持たない場所でも問題なくブラウズできる。
+            panel.directoryURL = suggested
         }
 
         guard panel.runModal() == .OK, let url = panel.url else { return false }

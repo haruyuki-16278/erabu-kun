@@ -61,7 +61,7 @@ enum KnownBrowser: String, CaseIterable, BrowserRepresentable {
         switch self {
         case .chrome, .chromeBeta, .chromeCanary,
              .edge, .edgeBeta, .edgeDev, .edgeCanary,
-             .brave, .vivaldi:
+             .brave, .vivaldi, .opera, .arc:
             return true
         default:
             return false
@@ -96,6 +96,8 @@ enum KnownBrowser: String, CaseIterable, BrowserRepresentable {
         case .edgeCanary: return "Microsoft Edge Canary/Local State"
         case .brave: return "BraveSoftware/Brave-Browser/Local State"
         case .vivaldi: return "Vivaldi/Local State"
+        case .opera: return "com.operasoftware.Opera/Local State"
+        case .arc: return "Arc/User Data/Local State"
         default: return nil
         }
     }
