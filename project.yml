@@ -28,6 +28,7 @@ targets:
         excludes:
           - "Info.plist"
           - "Erabukun.entitlements"
+          - "Erabukun-DeveloperID.entitlements"
       - path: bar-icon.png
     settings:
       base:

@@ -114,8 +114,13 @@ echo "Signing app with: ${DEVELOPER_ID}"
 # --deep: 内部のリソースやフレームワークにも再帰的に署名
 # --force: 既存の署名を上書き
 # --options runtime: Hardened Runtime を有効化（公証に必須）
-# --entitlements: App Sandbox を有効化（Mac App Store 対応 / セキュリティスコープブックマーク利用に必須）
-codesign --force --options runtime --deep --entitlements "src/Erabukun.entitlements" --sign "${DEVELOPER_ID}" "${APP_DIR}"
+# --entitlements: このDeveloper ID配布版（DMG直接配布）ではApp Sandboxを
+#   使用しない（src/Erabukun-DeveloperID.entitlements）。App Sandboxを
+#   有効化すると `open --args` で渡すブラウザのプロファイル指定引数が
+#   OS側で握りつぶされ、プロファイル指定機能が動作しなくなるため。
+#   Mac App Store提出用のSandbox版は src/Erabukun.entitlements
+#   （Xcode/project.yml経由のビルド）を使用する。
+codesign --force --options runtime --deep --entitlements "src/Erabukun-DeveloperID.entitlements" --sign "${DEVELOPER_ID}" "${APP_DIR}"
 
 echo "=== 3. 配布用DMGの作成 (スタイリング付き) ==="
 DMG_SRC_DIR="${BUILD_DIR}/dmg_source"

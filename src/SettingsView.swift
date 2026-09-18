@@ -95,11 +95,18 @@ struct SettingsView: View {
         var id: String { rawValue }
     }
     @State private var selectedTab: SettingsTab = .general
+
+    // App Sandbox配下（Mac App Store版）ではプロファイル指定機能自体が
+    // 実現できないため、フォルダアクセス許可を扱う「Data Access」タブは
+    // 表示する意味がなく、非表示にする。
+    private var visibleTabs: [SettingsTab] {
+        AppEnvironment.isSandboxed ? SettingsTab.allCases.filter { $0 != .dataAccess } : SettingsTab.allCases
+    }
     
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $selectedTab) {
-                ForEach(SettingsTab.allCases) { tab in
+                ForEach(visibleTabs) { tab in
                     Text(tab.rawValue).tag(tab)
                 }
             }

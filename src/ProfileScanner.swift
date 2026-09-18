@@ -79,8 +79,11 @@ class ProfileScanner {
             return [] // アプリが存在しない
         }
         
-        // プロファイルをサポートしないブラウザ（Safari, Firefox等）の場合は、単体プロファイルとして返す
-        if !knownBrowser.supportsProfiles {
+        // プロファイルをサポートしないブラウザ（Safari, Firefox等）の場合は、単体プロファイルとして返す。
+        // また、App Sandbox配下（Mac App Store版）ではプロファイル指定機能自体が
+        // 実現できないため、プロファイル対応ブラウザであっても単体プロファイル
+        // として扱い、ブラウザ単位の選択のみを提供する。
+        if !knownBrowser.supportsProfiles || AppEnvironment.isSandboxed {
             return [
                 BrowserProfile(
                     browserId: knownBrowser.id,
