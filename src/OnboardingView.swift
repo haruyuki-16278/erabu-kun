@@ -125,7 +125,6 @@ struct OnboardingView: View {
                 .padding(.top, 40)
                 .tag(3)
             }
-            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
             
             // Navigation controls
             HStack {
