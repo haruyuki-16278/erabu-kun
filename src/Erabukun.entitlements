@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Mac App Store 配布のために App Sandbox を有効化 -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+
+    <!-- ユーザーが NSOpenPanel で選択したフォルダ・ファイルへの読み取りアクセス。
+         ブラウザのプロファイルフォルダへのアクセス許可や、カスタムブラウザ
+         (.app) の追加に使用する。 -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+</dict>
+</plist>

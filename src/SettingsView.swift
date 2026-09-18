@@ -56,6 +56,10 @@ struct SettingsView: View {
     // ログイン時自動起動管理用 (macOS 13+)
     @State private var isLaunchAtLoginEnabled: Bool = false
     
+    // データアクセス許可管理用 (プロファイル対応ブラウザのうちインストール済みのもの)
+    @State private var installedProfileBrowsers: [KnownBrowser] = []
+    @State private var accessGrantVersion = 0 // 許可状態の変化を再描画に伝えるためのトリガー
+    
     var body: some View {
         TabView {
             // MARK: - General Tab
@@ -188,6 +192,54 @@ struct SettingsView: View {
                 .padding(.bottom)
             }
             .tabItem { Text("Ordering") }
+            
+            // MARK: - Data Access Tab
+            VStack(alignment: .leading) {
+                Text("Chrome系ブラウザのプロファイル一覧・アイコンを表示するには、プロファイルデータフォルダへのアクセスを許可してください。一度許可すれば、後から追加されたプロファイルも自動的に読み込まれます。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding([.top, .horizontal])
+                
+                List {
+                    ForEach(installedProfileBrowsers, id: \.id) { browser in
+                        HStack {
+                            Image(nsImage: browser.icon)
+                                .resizable()
+                                .frame(width: 24, height: 24)
+                            Text(browser.displayName)
+                            Spacer()
+                            
+                            if BrowserAccessStore.shared.hasAccess(for: browser.id) {
+                                Label("許可済み", systemImage: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .font(.caption)
+                                
+                                Button("変更...") {
+                                    grantAccess(for: browser)
+                                }
+                            } else {
+                                Button("アクセスを許可...") {
+                                    grantAccess(for: browser)
+                                }
+                            }
+                        }
+                        .id("\(browser.id)_\(accessGrantVersion)")
+                    }
+                }
+                .border(Color.secondary.opacity(0.2))
+                .padding(.horizontal)
+                .padding(.bottom)
+                
+                if installedProfileBrowsers.isEmpty {
+                    Text("プロファイル対応ブラウザ（Chrome, Edge, Brave, Vivaldi 等）が見つかりませんでした。")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                        .padding(.bottom)
+                }
+            }
+            .tabItem { Text("Data Access") }
         }
         .frame(width: 500, height: 350)
         .padding(.top, 10)
@@ -222,6 +274,15 @@ struct SettingsView: View {
             
             if #available(macOS 13.0, *) {
                 self.isLaunchAtLoginEnabled = SMAppService.mainApp.status == .enabled
+            }
+            
+            self.installedProfileBrowsers = KnownBrowser.allCases.filter { browser in
+                guard browser.supportsProfiles,
+                      let bundleId = browser.bundleIdentifier,
+                      let appUrl = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else {
+                    return false
+                }
+                return FileManager.default.fileExists(atPath: appUrl.path)
             }
         }
     }
@@ -303,8 +364,27 @@ struct SettingsView: View {
         settings.profileOrder = allProfilesForOrdering.map { $0.id }
     }
     
+    // MARK: - Data Access Actions
+    
+    private func grantAccess(for browser: KnownBrowser) {
+        let granted = BrowserAccessStore.shared.requestAccess(for: browser)
+        if granted {
+            // 許可状態が変わったので、関連する画面を再読み込みする
+            accessGrantVersion += 1
+            loadProfiles()
+            let scanned = ProfileScanner.scanAll()
+            let order = settings.profileOrder
+            self.allProfilesForOrdering = scanned.sorted { p1, p2 in
+                let idx1 = order.firstIndex(of: p1.id) ?? Int.max
+                let idx2 = order.firstIndex(of: p2.id) ?? Int.max
+                if idx1 == idx2 { return p1.name < p2.name }
+                return idx1 < idx2
+            }
+        }
+    }
+    
     private func profileIcon(for profile: BrowserProfile) -> NSImage {
-        if let path = profile.profileImagePath, let image = NSImage(contentsOfFile: path) {
+        if let data = profile.profileImageData, let image = NSImage(data: data) {
             return image
         }
         if let path = profile.appPath, !path.isEmpty {

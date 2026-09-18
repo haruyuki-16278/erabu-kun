@@ -99,6 +99,14 @@ enum KnownBrowser: String, CaseIterable, BrowserRepresentable {
         default: return nil
         }
     }
+    
+    // プロファイルデータ (Local State や各プロファイルフォルダ) が置かれているディレクトリ。
+    // App Sandbox 環境では、このフォルダをユーザーに選択してもらいアクセス許可を得る必要がある。
+    var userDataDirectoryURL: URL? {
+        guard let relativePath = localStateRelativePath else { return nil }
+        let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return appSupportURL.appendingPathComponent(relativePath).deletingLastPathComponent()
+    }
 }
 
 /// ユーザーが独自に追加したブラウザを表現する構造体
@@ -125,5 +133,8 @@ struct BrowserProfile: Identifiable, Hashable {
     let name: String              // 表示名
     let isProfileSupported: Bool  // プロファイル引数(--profile-directory)を使うか
     let appPath: String?          // カスタムブラウザ用の起動パス
-    var profileImagePath: String? = nil // 画像のパス
+    // プロファイル画像。App Sandbox下ではフォルダへのアクセス権がスキャン後に
+    // 失効するため、パスではなくスキャン時に読み込んだ画像データを保持する。
+    var profileImageData: Data? = nil
 }
+

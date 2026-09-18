@@ -48,15 +48,29 @@ class ProfileScanner {
             ]
         }
         
-        // Chrome系のプロファイルサポートブラウザの場合、Local State をスキャンする
-        let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        guard let relativePath = knownBrowser.localStateRelativePath else { return [] }
+        // Chrome系のプロファイルサポートブラウザの場合、ユーザーが許可した
+        // フォルダ (Security-Scoped Bookmark) 経由でのみ Local State を読み取れる。
+        // 未許可の場合は、設定画面でアクセスを許可してもらうまで表示できない。
+        guard BrowserAccessStore.shared.hasAccess(for: knownBrowser.id) else {
+            return []
+        }
         
-        let localStateURL = appSupportURL.appendingPathComponent(relativePath)
+        let profiles = BrowserAccessStore.shared.withAccess(for: knownBrowser.id) { userDataDirURL in
+            scanProfiles(userDataDirURL: userDataDirURL, knownBrowser: knownBrowser, appUrl: appUrl)
+        }
+        
+        return profiles ?? []
+    }
+    
+    /// アクセス許可済みのユーザーデータフォルダから Local State を読み取り、プロファイル一覧を構築する。
+    /// 呼び出し元で Security-Scoped Resource へのアクセスが開始されている前提。
+    private static func scanProfiles(userDataDirURL: URL, knownBrowser: KnownBrowser, appUrl: URL) -> [BrowserProfile] {
+        let fileManager = FileManager.default
+        let localStateURL = userDataDirURL.appendingPathComponent("Local State")
         
         // Local State ファイルがない（起動したことがないなど）場合でも、デフォルトプロファイルとして１つ返す
         guard fileManager.fileExists(atPath: localStateURL.path) else {
-            let defaultImagePath = findProfileImagePath(userDataDirURL: localStateURL.deletingLastPathComponent(), directoryName: "Default", knownBrowser: knownBrowser)
+            let defaultImageData = findProfileImageData(userDataDirURL: userDataDirURL, directoryName: "Default", knownBrowser: knownBrowser)
             return [
                 BrowserProfile(
                     browserId: knownBrowser.id,
@@ -65,7 +79,7 @@ class ProfileScanner {
                     name: "Default",
                     isProfileSupported: true,
                     appPath: appUrl.path,
-                    profileImagePath: defaultImagePath
+                    profileImageData: defaultImageData
                 )
             ]
         }
@@ -78,11 +92,9 @@ class ProfileScanner {
                let profileNode = json["profile"] as? [String: Any],
                let infoCache = profileNode["info_cache"] as? [String: [String: Any]] {
                 
-                let userDataDirURL = localStateURL.deletingLastPathComponent()
-                
                 for (directoryName, cacheData) in infoCache {
                     let displayName = cacheData["name"] as? String ?? directoryName
-                    let imagePath = findProfileImagePath(userDataDirURL: userDataDirURL, directoryName: directoryName, knownBrowser: knownBrowser)
+                    let imageData = findProfileImageData(userDataDirURL: userDataDirURL, directoryName: directoryName, knownBrowser: knownBrowser)
                     
                     let profile = BrowserProfile(
                         browserId: knownBrowser.id,
@@ -91,7 +103,7 @@ class ProfileScanner {
                         name: displayName,
                         isProfileSupported: true,
                         appPath: appUrl.path,
-                        profileImagePath: imagePath
+                        profileImageData: imageData
                     )
                     profiles.append(profile)
                 }
@@ -102,7 +114,7 @@ class ProfileScanner {
         
         // プロファイルが見つからなかった場合のフォールバック
         if profiles.isEmpty {
-            let defaultImagePath = findProfileImagePath(userDataDirURL: localStateURL.deletingLastPathComponent(), directoryName: "Default", knownBrowser: knownBrowser)
+            let defaultImageData = findProfileImageData(userDataDirURL: userDataDirURL, directoryName: "Default", knownBrowser: knownBrowser)
             profiles.append(
                 BrowserProfile(
                     browserId: knownBrowser.id,
@@ -111,7 +123,7 @@ class ProfileScanner {
                     name: "Default",
                     isProfileSupported: true,
                     appPath: appUrl.path,
-                    profileImagePath: defaultImagePath
+                    profileImageData: defaultImageData
                 )
             )
         }
@@ -119,13 +131,24 @@ class ProfileScanner {
         return profiles.sorted { $0.name < $1.name }
     }
     
-    private static func findProfileImagePath(userDataDirURL: URL, directoryName: String, knownBrowser: KnownBrowser) -> String? {
+    /// インストール済みだが、まだフォルダアクセスが許可されていないプロファイル対応ブラウザか判定する。
+    /// 設定画面で「アクセスを許可」の導線を出すために使用する。
+    static func needsAccessGrant(for knownBrowser: KnownBrowser) -> Bool {
+        guard knownBrowser.supportsProfiles,
+              let bundleId = knownBrowser.bundleIdentifier,
+              NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) != nil else {
+            return false
+        }
+        return !BrowserAccessStore.shared.hasAccess(for: knownBrowser.id)
+    }
+    
+    private static func findProfileImageData(userDataDirURL: URL, directoryName: String, knownBrowser: KnownBrowser) -> Data? {
         let profileDirURL = userDataDirURL.appendingPathComponent(directoryName)
         let fileManager = FileManager.default
         for picName in knownBrowser.profilePictureFileNames {
             let picURL = profileDirURL.appendingPathComponent(picName)
             if fileManager.fileExists(atPath: picURL.path) {
-                return picURL.path
+                return try? Data(contentsOf: picURL)
             }
         }
         return nil

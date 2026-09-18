@@ -61,7 +61,7 @@ struct ProfileCardView: View {
     @State private var isHovered = false
     
     var profileImage: NSImage? {
-        if let path = profile.profileImagePath, let image = NSImage(contentsOfFile: path) {
+        if let data = profile.profileImageData, let image = NSImage(data: data) {
             return image
         }
         return nil

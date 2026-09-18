@@ -5,43 +5,25 @@ class BrowserLauncher {
     
     /// BrowserProfileオブジェクトからURLを開く
     static func launch(url: URL, profile: BrowserProfile) {
-        let task = Process()
-        
-        // BundleIdentifier や Path からアプリケーションを指定
         let targetAppPath = profile.appPath ?? "/Applications/\(profile.browserName).app"
+        let appURL = URL(fileURLWithPath: targetAppPath)
         
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        
+        // LaunchServices (NSWorkspace) 経由で起動する。実行ファイルを直接 Process() で
+        // execするのと異なり、App Sandbox環境でも特別なentitlementなしに動作する。
+        var arguments: [String] = []
         if profile.isProfileSupported && profile.directoryName != "Default" {
-            // Chromium系でプロファイルを使う場合は `open` 経由ではなく、
-            // 直接内部の実行ファイル (MacOS/Google Chrome など) を叩く方が引数が安定して渡る。
-            // bundle identifier などを元に実行ファイルパスを特定する簡易的な方法。
-            let executableName = URL(fileURLWithPath: targetAppPath).deletingPathExtension().lastPathComponent
-            let binPath = "\(targetAppPath)/Contents/MacOS/\(executableName)"
-            
-            if FileManager.default.fileExists(atPath: binPath) {
-                // 直接実行ファイルを実行
-                task.executableURL = URL(fileURLWithPath: binPath)
-                task.arguments = [
-                    "--profile-directory=\(profile.directoryName)",
-                    url.absoluteString
-                ]
-            } else {
-                // 安全策として open コマンドに渡す場合
-                task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-                task.arguments = [
-                    "-n", "-a", targetAppPath,
-                    "--args", "--profile-directory=\(profile.directoryName)", url.absoluteString
-                ]
-            }
-        } else {
-            // プロファイル指定がない場合は標準の open コマンド
-            task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            task.arguments = ["-n", "-a", targetAppPath, url.absoluteString]
+            arguments.append("--profile-directory=\(profile.directoryName)")
         }
+        arguments.append(url.absoluteString)
+        configuration.arguments = arguments
         
-        do {
-            try task.run()
-        } catch {
-            print("Failed to launch browser: \(error)")
+        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration) { _, error in
+            if let error = error {
+                print("Failed to launch browser: \(error)")
+            }
         }
     }
     
