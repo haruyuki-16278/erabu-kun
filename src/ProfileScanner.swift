@@ -5,9 +5,50 @@ class ProfileScanner {
     
     // カスタムブラウザの保存キー
     private static let customBrowsersKey = "customBrowsers"
-    
+
+    /// App Store用スクリーンショット撮影時に、実際のブラウザ/プロファイル情報の
+    /// 代わりにダミーデータを表示するためのデモモード。
+    /// `ERABUKUN_SCREENSHOT_DEMO=1` 環境変数を付けて起動した場合のみ有効になり、
+    /// 通常の配布ビルド・通常起動には一切影響しない。
+    private static var isScreenshotDemoMode: Bool {
+        ProcessInfo.processInfo.environment["ERABUKUN_SCREENSHOT_DEMO"] == "1"
+    }
+
+    private static func demoProfiles() -> [BrowserProfile] {
+        [
+            BrowserProfile(
+                browserId: KnownBrowser.chrome.id,
+                browserName: KnownBrowser.chrome.displayName,
+                directoryName: "Default",
+                name: "Work",
+                isProfileSupported: true,
+                appPath: nil
+            ),
+            BrowserProfile(
+                browserId: KnownBrowser.chrome.id,
+                browserName: KnownBrowser.chrome.displayName,
+                directoryName: "Profile 1",
+                name: "Personal",
+                isProfileSupported: true,
+                appPath: nil
+            ),
+            BrowserProfile(
+                browserId: KnownBrowser.edge.id,
+                browserName: KnownBrowser.edge.displayName,
+                directoryName: "Default",
+                name: "Work",
+                isProfileSupported: true,
+                appPath: nil
+            )
+        ]
+    }
+
     /// インストール済みの全ブラウザのプロファイルをスキャンする
     static func scanAll() -> [BrowserProfile] {
+        if isScreenshotDemoMode {
+            return demoProfiles()
+        }
+
         var profiles: [BrowserProfile] = []
         
         // 1. 既知のブラウザのスキャン
@@ -25,6 +66,10 @@ class ProfileScanner {
     
     /// 既知のブラウザのプロファイルをスキャン
     static func scan(knownBrowser: KnownBrowser) -> [BrowserProfile] {
+        if isScreenshotDemoMode {
+            return demoProfiles().filter { $0.browserId == knownBrowser.id }
+        }
+
         let fileManager = FileManager.default
         
         // インストールチェック (Application フォルダ等に存在するか)
