@@ -25,7 +25,7 @@ class BrowserLauncher {
             task.arguments = ["-n", "-a", targetAppPath, url.absoluteString]
         } else {
             var arguments = ["-n", "-a", targetAppPath, "--args"]
-            if profile.isProfileSupported && profile.directoryName != "Default" {
+            if profile.isProfileSupported {
                 arguments.append("--profile-directory=\(profile.directoryName)")
             }
             arguments.append(url.absoluteString)
