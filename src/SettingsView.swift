@@ -60,189 +60,49 @@ struct SettingsView: View {
     @State private var installedProfileBrowsers: [KnownBrowser] = []
     @State private var accessGrantVersion = 0 // 許可状態の変化を再描画に伝えるためのトリガー
     
+    // タブ切り替え用
+    // 注意: SwiftUIの標準 TabView はmacOS 26以降でツールバー統合型の
+    // デザインに変更され、独自生成のNSWindow（トゥールバー無し）に
+    // ホストするとタブ切り替えUIが表示されない問題があるため、
+    // 自前のセグメントコントロールでタブ切り替えを実装している。
+    private enum SettingsTab: String, CaseIterable, Identifiable {
+        case general = "General"
+        case customBrowsers = "Custom Browsers"
+        case ordering = "Ordering"
+        case dataAccess = "Data Access"
+        
+        var id: String { rawValue }
+    }
+    @State private var selectedTab: SettingsTab = .general
+    
     var body: some View {
-        TabView {
-            // MARK: - General Tab
-            VStack(alignment: .leading, spacing: 20) {
-                Form {
-                    Picker("Default Browser", selection: $settings.defaultBrowserID) {
-                        // 既知のブラウザ
-                        ForEach(KnownBrowser.allCases) { browser in
-                            Text(browser.displayName).tag(browser.id)
-                        }
-                        
-                        // カスタムブラウザ
-                        if !customBrowsers.isEmpty {
-                            Divider()
-                            ForEach(customBrowsers, id: \.id) { custom in
-                                Text(custom.displayName).tag(custom.id)
-                            }
-                        }
-                    }
-                    .onChangeCompat(of: settings.defaultBrowserID) { _ in
-                        loadProfiles()
-                        if let first = availableProfiles.first {
-                            settings.defaultProfileName = first.directoryName
-                        }
-                    }
-                    
-                    Picker("Default Profile", selection: $settings.defaultProfileName) {
-                        if availableProfiles.isEmpty {
-                            Text("No Profiles Found").tag("Default")
-                        } else {
-                            ForEach(availableProfiles, id: \.directoryName) { profile in
-                                Text(profile.name).tag(profile.directoryName)
-                            }
-                        }
-                    }
-                    
-                    if #available(macOS 13.0, *) {
-                        Divider()
-                        
-                        Toggle("Launch at Login", isOn: $isLaunchAtLoginEnabled)
-                            .onChangeCompat(of: isLaunchAtLoginEnabled) { newValue in
-                                toggleLaunchAtLogin(enabled: newValue)
-                            }
-                    }
+        VStack(spacing: 0) {
+            Picker("", selection: $selectedTab) {
+                ForEach(SettingsTab.allCases) { tab in
+                    Text(tab.rawValue).tag(tab)
                 }
-                .padding()
-                
-                Spacer()
-                
-                HStack {
-                    Button("Set as Default Browser") {
-                        setAsDefaultBrowser()
-                    }
-                    
-                    Spacer()
-                }
-                .padding()
             }
-            .tabItem { Text("General") }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding([.horizontal, .top])
+            .padding(.bottom, 8)
             
-            // MARK: - Custom Browsers Tab
-            VStack(alignment: .leading) {
-                Text("Add unlisted browsers (.app files) to the selection popup.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding([.top, .horizontal])
-                
-                List {
-                    ForEach(customBrowsers, id: \.id) { browser in
-                        HStack {
-                            Image(nsImage: browser.icon)
-                                .resizable()
-                                .frame(width: 24, height: 24)
-                            Text(browser.displayName)
-                            Spacer()
-                            Text(URL(fileURLWithPath: browser.appPath).lastPathComponent)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .onDelete(perform: removeCustomBrowser)
-                }
-                .border(Color.secondary.opacity(0.2))
-                .padding(.horizontal)
-                
-                HStack {
-                    Button(action: selectAppAndAdd) {
-                        Label("Add Browser...", systemImage: "plus")
-                    }
-                    
-                    Spacer()
-                    // 削除用ヒント
-                    if !customBrowsers.isEmpty {
-                        Text("Select and press Delete key to remove")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding()
-            }
-            .tabItem { Text("Custom Browsers") }
+            Divider()
             
-            // MARK: - Profile Order Tab
-            VStack(alignment: .leading) {
-                Text("Drag and drop to reorder profiles in the popup window.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding([.top, .horizontal])
-                
-                List {
-                    ForEach(allProfilesForOrdering) { profile in
-                        HStack {
-                            Image(nsImage: profileIcon(for: profile))
-                                .resizable()
-                                .frame(width: 24, height: 24)
-                                .clipShape(Circle())
-                            Text(profile.name)
-                            Spacer()
-                            if profile.name != profile.browserName {
-                                Text(profile.browserName)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    .onMove(perform: moveProfiles)
-                }
-                .border(Color.secondary.opacity(0.2))
-                .padding(.horizontal)
-                .padding(.bottom)
-            }
-            .tabItem { Text("Ordering") }
-            
-            // MARK: - Data Access Tab
-            VStack(alignment: .leading) {
-                Text("Chrome系ブラウザのプロファイル一覧・アイコンを表示するには、プロファイルデータフォルダへのアクセスを許可してください。一度許可すれば、後から追加されたプロファイルも自動的に読み込まれます。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding([.top, .horizontal])
-                
-                List {
-                    ForEach(installedProfileBrowsers, id: \.id) { browser in
-                        HStack {
-                            Image(nsImage: browser.icon)
-                                .resizable()
-                                .frame(width: 24, height: 24)
-                            Text(browser.displayName)
-                            Spacer()
-                            
-                            if BrowserAccessStore.shared.hasAccess(for: browser.id) {
-                                Label("許可済み", systemImage: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                    .font(.caption)
-                                
-                                Button("変更...") {
-                                    grantAccess(for: browser)
-                                }
-                            } else {
-                                Button("アクセスを許可...") {
-                                    grantAccess(for: browser)
-                                }
-                            }
-                        }
-                        .id("\(browser.id)_\(accessGrantVersion)")
-                    }
-                }
-                .border(Color.secondary.opacity(0.2))
-                .padding(.horizontal)
-                .padding(.bottom)
-                
-                if installedProfileBrowsers.isEmpty {
-                    Text("プロファイル対応ブラウザ（Chrome, Edge, Brave, Vivaldi 等）が見つかりませんでした。")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal)
-                        .padding(.bottom)
+            Group {
+                switch selectedTab {
+                case .general:
+                    generalTab
+                case .customBrowsers:
+                    customBrowsersTab
+                case .ordering:
+                    orderingTab
+                case .dataAccess:
+                    dataAccessTab
                 }
             }
-            .tabItem { Text("Data Access") }
         }
         .frame(width: 500, height: 350)
-        .padding(.top, 10)
         // 共通の閉じるボタンはウィンドウ枠を使う想定だが、念のため配置
         .overlay(
             VStack {
@@ -283,6 +143,189 @@ struct SettingsView: View {
                     return false
                 }
                 return FileManager.default.fileExists(atPath: appUrl.path)
+            }
+        }
+    }
+    
+    // MARK: - General Tab
+    private var generalTab: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Form {
+                Picker("Default Browser", selection: $settings.defaultBrowserID) {
+                    // 既知のブラウザ
+                    ForEach(KnownBrowser.allCases) { browser in
+                        Text(browser.displayName).tag(browser.id)
+                    }
+                    
+                    // カスタムブラウザ
+                    if !customBrowsers.isEmpty {
+                        Divider()
+                        ForEach(customBrowsers, id: \.id) { custom in
+                            Text(custom.displayName).tag(custom.id)
+                        }
+                    }
+                }
+                .onChangeCompat(of: settings.defaultBrowserID) { _ in
+                    loadProfiles()
+                    if let first = availableProfiles.first {
+                        settings.defaultProfileName = first.directoryName
+                    }
+                }
+                
+                Picker("Default Profile", selection: $settings.defaultProfileName) {
+                    if availableProfiles.isEmpty {
+                        Text("No Profiles Found").tag("Default")
+                    } else {
+                        ForEach(availableProfiles, id: \.directoryName) { profile in
+                            Text(profile.name).tag(profile.directoryName)
+                        }
+                    }
+                }
+                
+                if #available(macOS 13.0, *) {
+                    Divider()
+                    
+                    Toggle("Launch at Login", isOn: $isLaunchAtLoginEnabled)
+                        .onChangeCompat(of: isLaunchAtLoginEnabled) { newValue in
+                            toggleLaunchAtLogin(enabled: newValue)
+                        }
+                }
+            }
+            .padding()
+            
+            Spacer()
+            
+            HStack {
+                Button("Set as Default Browser") {
+                    setAsDefaultBrowser()
+                }
+                
+                Spacer()
+            }
+            .padding()
+        }
+    }
+    
+    // MARK: - Custom Browsers Tab
+    private var customBrowsersTab: some View {
+        VStack(alignment: .leading) {
+            Text("Add unlisted browsers (.app files) to the selection popup.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding([.top, .horizontal])
+            
+            List {
+                ForEach(customBrowsers, id: \.id) { browser in
+                    HStack {
+                        Image(nsImage: browser.icon)
+                            .resizable()
+                            .frame(width: 24, height: 24)
+                        Text(browser.displayName)
+                        Spacer()
+                        Text(URL(fileURLWithPath: browser.appPath).lastPathComponent)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .onDelete(perform: removeCustomBrowser)
+            }
+            .border(Color.secondary.opacity(0.2))
+            .padding(.horizontal)
+            
+            HStack {
+                Button(action: selectAppAndAdd) {
+                    Label("Add Browser...", systemImage: "plus")
+                }
+                
+                Spacer()
+                // 削除用ヒント
+                if !customBrowsers.isEmpty {
+                    Text("Select and press Delete key to remove")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding()
+        }
+    }
+    
+    // MARK: - Profile Order Tab
+    private var orderingTab: some View {
+        VStack(alignment: .leading) {
+            Text("Drag and drop to reorder profiles in the popup window.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding([.top, .horizontal])
+            
+            List {
+                ForEach(allProfilesForOrdering) { profile in
+                    HStack {
+                        Image(nsImage: profileIcon(for: profile))
+                            .resizable()
+                            .frame(width: 24, height: 24)
+                            .clipShape(Circle())
+                        Text(profile.name)
+                        Spacer()
+                        if profile.name != profile.browserName {
+                            Text(profile.browserName)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .onMove(perform: moveProfiles)
+            }
+            .border(Color.secondary.opacity(0.2))
+            .padding(.horizontal)
+            .padding(.bottom)
+        }
+    }
+    
+    // MARK: - Data Access Tab
+    private var dataAccessTab: some View {
+        VStack(alignment: .leading) {
+            Text("Chrome系ブラウザのプロファイル一覧・アイコンを表示するには、プロファイルデータフォルダへのアクセスを許可してください。一度許可すれば、後から追加されたプロファイルも自動的に読み込まれます。")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding([.top, .horizontal])
+            
+            List {
+                ForEach(installedProfileBrowsers, id: \.id) { browser in
+                    HStack {
+                        Image(nsImage: browser.icon)
+                            .resizable()
+                            .frame(width: 24, height: 24)
+                        Text(browser.displayName)
+                        Spacer()
+                        
+                        if BrowserAccessStore.shared.hasAccess(for: browser.id) {
+                            Label("許可済み", systemImage: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.caption)
+                            
+                            Button("変更...") {
+                                grantAccess(for: browser)
+                            }
+                        } else {
+                            Button("アクセスを許可...") {
+                                grantAccess(for: browser)
+                            }
+                        }
+                    }
+                    .id("\(browser.id)_\(accessGrantVersion)")
+                }
+            }
+            .border(Color.secondary.opacity(0.2))
+            .padding(.horizontal)
+            .padding(.bottom)
+            
+            if installedProfileBrowsers.isEmpty {
+                Text("プロファイル対応ブラウザ（Chrome, Edge, Brave, Vivaldi 等）が見つかりませんでした。")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal)
+                    .padding(.bottom)
             }
         }
     }
