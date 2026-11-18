@@ -27,12 +27,13 @@ for source_file in "$repo_root"/src/*.swift; do
 done
 
 test_binary="$work_dir/BrowserLauncherTests"
+host_arch="$(uname -m)"
 
 echo "Compiling ${#sources[@]} source files plus test runner..."
 swiftc -parse-as-library \
     "$repo_root/tests/BrowserLauncherTests.swift" \
     "${sources[@]}" \
-    -target arm64-apple-macosx13.0 \
+    -target "${host_arch}-apple-macosx13.0" \
     -framework SwiftUI -framework AppKit -framework Foundation \
     -o "$test_binary"
 
