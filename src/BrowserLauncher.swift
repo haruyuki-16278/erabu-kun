@@ -18,10 +18,12 @@ class BrowserLauncher {
         // そのため、Sandbox配下（Mac App Store版）では `--profile-directory=` の
         // 付与を諦めてURLのみを渡し（＝ブラウザ選択のみ）、Sandboxなし
         // （Developer ID配布版）では従来通りプロファイル指定込みで起動する。
+        // プロファイル非対応のブラウザ（Safari/Firefox等）は、Sandboxの有無に関わらず
+        // `--args` を使わず URL のみを渡す。
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
 
-        if AppEnvironment.isSandboxed {
+        if AppEnvironment.isSandboxed || !profile.isProfileSupported {
             task.arguments = ["-n", "-a", targetAppPath, url.absoluteString]
         } else {
             var arguments = ["-n", "-a", targetAppPath, "--args"]
