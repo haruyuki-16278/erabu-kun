@@ -5,17 +5,37 @@ on:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release:
+        type: boolean
+        default: false
+        description: "Create a signed GitHub Release and update Pages (main only)"
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
   build:
     runs-on: macos-latest
     timeout-minutes: 60
+    outputs:
+      publish: ${{ steps.release.outputs.publish }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      release_id: ${{ steps.publish.outputs.id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare release metadata
+        id: release
+        env:
+          INPUT_RELEASE: ${{ inputs.release }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/prepare_release.sh
 
       - name: Import Developer ID signing certificate
         env:
@@ -49,6 +69,7 @@ jobs:
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: ./build_release.sh
 
       - name: Upload DMG artifact
@@ -59,12 +80,50 @@ jobs:
           if-no-files-found: error
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        id: publish
+        if: steps.release.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          make_latest: "false"
           files: build/Erabu-kun.dmg
+          fail_on_unmatched_files: "true"
           generate_release_notes: true
 
       - name: Remove temporary keychain
         if: always()
         run: security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" || true
+
+  publish-pages:
+    needs: build
+    if: needs.build.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pages: write
+    concurrency:
+      group: release-pages
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - name: Checkout pinned release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+
+      - name: Update release page and promote release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          RELEASE_ID: ${{ needs.build.outputs.release_id }}
+          RELEASE_RUN_NUMBER: ${{ github.run_number }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: bash scripts/publish_release_page.sh site
