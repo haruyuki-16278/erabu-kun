@@ -14,6 +14,22 @@ DEVELOPER_ID="Developer ID Application: Toshiyuki Yamaji (3N2Q57WT95)"
 TEAM_ID="3N2Q57WT95"
 
 # ==========================================
+# 0-a. アプリのバージョン (CFBundleShortVersionString) の決定
+# ==========================================
+# 優先順位: 明示的な RELEASE_TAG（CI の prepare ステップ出力）→ タグ push の GITHUB_REF_NAME → 現在の UTC 日付。
+# 検証は scripts/release_version.sh に共通化している。不正なタグは認証・ビルド削除より前に止める。
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+RELEASE_VERSION_SCRIPT="${SCRIPT_DIR}/scripts/release_version.sh"
+
+if [ -n "${RELEASE_TAG:-}" ]; then
+    APP_VERSION=$(bash "$RELEASE_VERSION_SCRIPT" "$RELEASE_TAG")
+elif [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+    APP_VERSION=$(bash "$RELEASE_VERSION_SCRIPT" "${GITHUB_REF_NAME:-}")
+else
+    APP_VERSION=$(bash "$RELEASE_VERSION_SCRIPT")
+fi
+
+# ==========================================
 # 0. .env の読み込みと認証情報のチェック
 # ==========================================
 if [ -f .env ]; then
@@ -52,6 +68,10 @@ mkdir -p "${MAC_OS_DIR}"
 mkdir -p "${RESOURCES_DIR}"
 
 cp src/Info.plist "${CONTENTS_DIR}/Info.plist"
+
+# リリースバージョンは配布用にコピーした Info.plist にのみ書き込む（src/Info.plist は変更しない）
+echo "リリースバージョン: ${APP_VERSION} (CFBundleShortVersionString)"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${APP_VERSION}" "${CONTENTS_DIR}/Info.plist"
 
 # ビルド番号は git のコミット数から自動生成する（コミットのたびに一意な連番になる）
 BUILD_NUMBER=$(git rev-list --count HEAD)

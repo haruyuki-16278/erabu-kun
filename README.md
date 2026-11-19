@@ -5,7 +5,7 @@ Erabu-kun は、リンクを開く際にどのブラウザで開くかを動的�
 配布は **Developer ID（notarized DMG）経由のみ** です。App Sandboxが必須の
 Mac App Storeではプロファイル別振り分け機能が利用できないため（詳細は後述）、
 本アプリはMac App Storeでは配布していません。
-紹介ページ: https://haruyuki-16278.github.io/erabu-kun/
+紹介ページ: https://erabu-kun.relicsnow.net/
 
 ## 特徴
 - メニューバーに常駐し、URLを開く際のデフォルトブラウザとして動作します。
@@ -79,24 +79,37 @@ Xcode上でのデバッグ実行や将来的な再提出の検討も可能です
 
 ## CI（GitHub Actions）でのビルドについて
 
-`main` ブランチへの push、または手動実行（`workflow_dispatch`）で、
+`main` ブランチへの push、タグの push、または手動実行（`workflow_dispatch`）で、
 `.github/workflows/build-and-release.yml` が macOS ランナー上でビルド・署名・
 公証・DMG化までを自動実行し、成果物として `Erabu-kun.dmg` をアーティファクトに
-アップロードします。
+アップロードします。**main へのマージ・push だけではリリースを公開しません。**
 
-さらに `v*` 形式のタグ（例: `v1.0.1`）をpushすると、同じワークフローが
-DMGを添付した [GitHub Release](https://github.com/haruyuki-16278/erabu-kun/releases)
-を自動作成します。新しいバージョンを公開する際は、`src/Info.plist` の
-`CFBundleShortVersionString` を更新した上で以下のようにタグを打ってください。
+公開するときは GitHub の **Actions → Build, Sign, and Package DMG → Run workflow** で、
+ブランチに `main` を選び、**release** にチェックを入れて実行してください。
+既定値はオフで、チェックを入れない実行はビルドとアーティファクトの保存だけを行います。
+誤公開を防ぐため、`main` 以外を指定して `release` をオンにした実行はエラーになります。
 
-```
-git tag -a v1.0.2 -m "v1.0.2"
-git push origin v1.0.2
-```
+リリースは CalVer を使い、タグを `vYYYY.MM.DD-実行番号`（例: `v2026.11.19-42`）として
+自動作成します。日付はワークフロー実行の作成日時の UTC 日付、実行番号は
+`github.run_number` です。同日に複数回公開でき、同じ実行の再実行では同じタグを使います。
+タグは実行対象のコミットに固定され、既存タグが別のコミットを指している場合は停止します。
 
-紹介用のランディングページ（`gh-pages` ブランチ、
-https://haruyuki-16278.github.io/erabu-kun/ ）は最新Releaseへ自動リンクしているため、
-リリースを作成するだけでダウンロードリンクも更新されます。
+アプリの `CFBundleShortVersionString` は実行番号を含まない `YYYY.MM.DD` です。
+ビルド番号（`CFBundleVersion`）には git のコミット数を使います。同じコミットの再実行では
+ビルド番号も同じになります。`src/Info.plist` は変更せず、配布用にコピーした plist だけに
+バージョンを設定するため、リリース時の手動更新は不要です。Xcode の開発ビルドでは
+引き続き `src/Info.plist` の静的な値を使います。
+
+公開しないブランチ上のビルドはビルド時点の UTC 日付を使います。既存の
+`vYYYY.MM.DD` または `vYYYY.MM.DD-正の実行番号` タグ上のビルドはタグの日付を使います。
+不正な形式や存在しない日付はビルド前に拒否します。**タグの push だけでも公開しません。**
+
+署名・公証・DMG 作成に成功してから
+[GitHub Release](https://github.com/haruyuki-16278/erabu-kun/releases) を作成し、その後
+[紹介ページ](https://erabu-kun.relicsnow.net/) の表示バージョンと DMG ダウンロードリンクを
+更新します。`gh-pages` ブランチの独自ドメイン設定、画像、プライバシーページは維持します。
+Pages の更新と最新リリースへの昇格は直列化し、遅れて完了した古い実行で巻き戻さないようにします。
+`GITHUB_TOKEN` の push だけに頼らず、Pages ビルドも API で明示的に要求します。
 
 CIを動かすには、リポジトリの **Settings > Secrets and variables > Actions** で
 以下のSecretsを事前に登録してください（秘密鍵を含むため、これらはご自身で
