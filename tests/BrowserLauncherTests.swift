@@ -46,7 +46,7 @@ private let complexURL = URL(
 
 private func safariProfile(appPath: String? = safariPath) -> BrowserProfile {
     BrowserProfile(
-        browserId: "com.apple.Safari",
+        browserId: KnownBrowser.safari.id,
         browserName: "Safari",
         directoryName: "Default",
         name: "Safari",
@@ -100,9 +100,9 @@ private func expectOpenInvocation(_ task: Process, _ expected: [String]) throws 
 }
 
 // AC-1 (and AC-6): Safari does not support profile arguments. Outside the
-// sandbox, the URL must be passed as an open document: `-n -a <app> <url>`,
-// with no `--args`. The complex URL must stay one unchanged argument.
-// Currently fails: the non-sandboxed branch always inserts `--args` first.
+// sandbox, the URL is passed as an open document: `-a <app> <url>`, with no
+// `-n` (so a running Safari is reused) and no `--args`. The complex URL must
+// stay one unchanged argument.
 func testSafariNonSandboxedPassesURLAsDocument() throws {
     let task = try launchAndCapture(
         url: complexURL,
@@ -111,7 +111,7 @@ func testSafariNonSandboxedPassesURLAsDocument() throws {
     )
     try expectOpenInvocation(
         task,
-        ["-n", "-a", safariPath, complexURL.absoluteString]
+        ["-a", safariPath, complexURL.absoluteString]
     )
 }
 
@@ -134,7 +134,8 @@ func testChromeNonSandboxedKeepsProfileArgumentsBeforeURL() throws {
 }
 
 // AC-3: Inside the sandbox, profile arguments are omitted whether or not the
-// browser supports them. Only `-n -a <app> <url>` is produced. Regression guard.
+// browser supports them. Chrome gets `-n -a <app> <url>`. Safari gets
+// `-a <app> <url>` with no `-n`, so a running Safari is reused. Regression guard.
 func testSandboxedOmitsProfileArgumentsForSupportedAndUnsupportedBrowsers() throws {
     let chromeTask = try launchAndCapture(
         url: complexURL,
@@ -153,7 +154,7 @@ func testSandboxedOmitsProfileArgumentsForSupportedAndUnsupportedBrowsers() thro
     )
     try expectOpenInvocation(
         safariTask,
-        ["-n", "-a", safariPath, complexURL.absoluteString]
+        ["-a", safariPath, complexURL.absoluteString]
     )
 }
 
@@ -217,6 +218,23 @@ func testUnsupportedFirefoxAndCustomBrowserPassURLAsDocument() throws {
     )
 }
 
+// AC-8: Safari reuses a running instance in both sandbox modes, so the open
+// invocation has no `-n`. With no stored appPath, the fallback is
+// /Applications/Safari.app. Both sandbox values run in this one case.
+func testSafariNilAppPathFallsBackWithoutNewInstance() throws {
+    for sandboxed in [false, true] {
+        let task = try launchAndCapture(
+            url: complexURL,
+            profile: safariProfile(appPath: nil),
+            sandboxed: sandboxed
+        )
+        try expectOpenInvocation(
+            task,
+            ["-a", "/Applications/Safari.app", complexURL.absoluteString]
+        )
+    }
+}
+
 // AC-7 (RecentLaunchStore bookkeeping) is not covered here. It is recorded on
 // the main queue, and checking it would need a run-loop wait, which would
 // make the test timing-dependent.
@@ -230,6 +248,7 @@ enum BrowserLauncherTestRunner {
             ("AC-3 sandboxed omits profile args (supported and unsupported)", testSandboxedOmitsProfileArgumentsForSupportedAndUnsupportedBrowsers),
             ("AC-4 nil appPath falls back to /Applications", testNilAppPathFallsBackToApplicationsFolder),
             ("AC-5 Firefox and custom browser non-sandboxed pass URL as open document", testUnsupportedFirefoxAndCustomBrowserPassURLAsDocument),
+            ("AC-8 Safari nil appPath falls back to /Applications without -n", testSafariNilAppPathFallsBackWithoutNewInstance),
         ]
 
         var failures = 0

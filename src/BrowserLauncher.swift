@@ -23,7 +23,10 @@ class BrowserLauncher {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
 
-        if AppEnvironment.isSandboxed || !profile.isProfileSupported {
+        if profile.browserId == KnownBrowser.safari.id {
+            // Safariは `-n` を付けず、起動中なら既存ウィンドウ/プロセスを再利用する
+            task.arguments = ["-a", targetAppPath, url.absoluteString]
+        } else if AppEnvironment.isSandboxed || !profile.isProfileSupported {
             task.arguments = ["-n", "-a", targetAppPath, url.absoluteString]
         } else {
             var arguments = ["-n", "-a", targetAppPath, "--args"]
